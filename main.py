@@ -1,10 +1,11 @@
 #! /usr/bin/env python3
 
-from os import geteuid
+from os import geteuid, system
 from scapy.all import *
 from datetime import date
 from optparse import OptionParser
 from colorama import Fore, Back, Style
+from threading import Thread, Lock
 from time import strftime, localtime, sleep, time
 
 status_color = {
@@ -27,9 +28,22 @@ def get_arguments(*args):
 def check_root():
     return geteuid() == 0
 
+lock = Lock()
+current_channel = None
+channel_hopping_delay = 0.5
+
+def hop_channels(interface, channels, delay):
+    global current_channel
+    while True:
+        for channel in channels:
+            current_channel = channel
+            system(f"iwconfig {interface} channel {channel}")
+            sleep(delay)
+
 if __name__ == "__main__":
     arguments = get_arguments(('-i', "--interface", "interface", "Network Interface to Start Sniffing on"),
                               ('-c', "--channel", "channel", "Channels to Sniff on (Seperated by ',' if multiple, Default=Channel Hopping)"),
+                              ('-d', "--delay", "delay", f"Delay Between Channel Hopping (Default={channel_hopping_delay})")
                               ('-w', "--write", "write", "Dump Packets to a File"))
     if not check_root():
         display('-', f"This Program requires {Back.YELLOW}root{Back.RESET} Privileges")
@@ -42,3 +56,9 @@ if __name__ == "__main__":
         arguments.channel = [channel for channel in range(1, 15)]
     else:
         arguments.channel = arguments.channel.split(',')
+    if not arguments.delay:
+        arguments.delay = channel_hopping_delay
+    else:
+        arguments.delay = float(arguments.delay)
+    display(':', f"Starting Channel Hopping Daemon Thread on Channels {Back.MAGENTA}{','.join(arguments.channels)}{Back.RESET}")
+    Thread(target=hop_channels, args=(arguments.interface, arguments.channel, arguments.delay), daemon=True)
