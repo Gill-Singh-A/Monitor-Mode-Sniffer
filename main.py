@@ -39,11 +39,21 @@ def hop_channels(interface, channels, delay):
             current_channel = channel
             system(f"iwconfig {interface} channel {channel}")
             sleep(delay)
+def process_packet(packet):
+    if packet.haslayer(Dot11Beacon):
+        essid = packet[Dot11Elt].info.decode()
+        bssid = packet[Dot11].addr2.upper()
+        rate = packet[RadioTap].Rate
+        channel_frequency = packet[RadioTap].ChannelFrequency
+        signal_strength = packet[RadioTap].dBm_AntSignal
+        network_stats = packet[Dot11Beacon].network_stats()
+        channel = network_stats["channel"]
+        crypto = list(network_stats["crypto"])[0]
 
 if __name__ == "__main__":
     arguments = get_arguments(('-i', "--interface", "interface", "Network Interface to Start Sniffing on"),
                               ('-c', "--channel", "channel", "Channels to Sniff on (Seperated by ',' if multiple, Default=Channel Hopping)"),
-                              ('-d', "--delay", "delay", f"Delay Between Channel Hopping (Default={channel_hopping_delay})")
+                              ('-d', "--delay", "delay", f"Delay Between Channel Hopping (Default={channel_hopping_delay})"),
                               ('-w', "--write", "write", "Dump Packets to a File"))
     if not check_root():
         display('-', f"This Program requires {Back.YELLOW}root{Back.RESET} Privileges")
@@ -53,12 +63,20 @@ if __name__ == "__main__":
         display('*', f"Available Interfaces : {Back.MAGENTA}{get_if_list()}{Back.RESET}")
         exit(0)
     if not arguments.channel:
-        arguments.channel = [channel for channel in range(1, 15)]
+        arguments.channel = [str(channel) for channel in range(1, 15)]
     else:
         arguments.channel = arguments.channel.split(',')
     if not arguments.delay:
         arguments.delay = channel_hopping_delay
     else:
         arguments.delay = float(arguments.delay)
-    display(':', f"Starting Channel Hopping Daemon Thread on Channels {Back.MAGENTA}{','.join(arguments.channels)}{Back.RESET}")
+    display(':', f"Starting Channel Hopping Daemon Thread on Channels {Back.MAGENTA}{','.join(arguments.channel)}{Back.RESET}")
     Thread(target=hop_channels, args=(arguments.interface, arguments.channel, arguments.delay), daemon=True)
+    display(':', f"Starting Sniffing on Interface {Back.MAGENTA}{arguments.interface}{Back.RESET}")
+    sleep(1)
+    try:
+        sniff(iface=arguments.interface, prn=process_packet)
+    except KeyboardInterrupt:
+        display('*', f"Keyboard Interrupt Detected! Exiting...", start='\n')
+    except Exception as error:
+        display('-', f"Error Occured = {Back.YELLOW}{error}{Back.RESET}")
