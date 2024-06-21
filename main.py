@@ -36,6 +36,7 @@ running = True
 
 beacon_frames = {}
 access_points = {}
+probes = {}
 
 def hop_channels(interface, channels, delay):
     global current_channel
@@ -64,14 +65,27 @@ def process_packet(packet):
                 "channel" : channel,
                 "crypto" : crypto,
             }
-            if bssid not in beacon_frames:
+            if bssid not in beacon_frames.keys():
                 beacon_frames[bssid] = 0
             beacon_frames[bssid] += 1
+    if packet.haslayer(Dot11ProbeReq):
+        bssid = packet[Dot11].addr2.upper()
+        probe_essid = packet[Dot11Elt].info.decode()
+        rate = packet[RadioTap].Rate
+        channel_frequency = packet[RadioTap].ChannelFrequency
+        signal_strength = packet[RadioTap].dBm_AntSignal
+        with lock:
+            if bssid not in probes.keys():
+                probes[bssid] = {"probes": set()}
+            probes[bssid]["rate"] = rate
+            probes[bssid]["channel_frequency"] = channel_frequency
+            probes[bssid]["signal_strength"] = signal_strength
+            probes[bssid]["probes"].add(probe_essid)
 def display_details():
     while running:
         system("clear")
-        print(f"Current Channel = {current_channel}\n{Fore.CYAN}BSSID            \tPOWER\tBEACONS\tCHANNEL\tRATE\tFREQUENCY\tCRYPTO\t\tESSID{Fore.RESET}")
         with lock:
+            print(f"Current Channel = {current_channel}\n{Fore.CYAN}BSSID            \tPOWER\tBEACONS\tCHANNEL\tRATE\tFREQUENCY\tCRYPTO\t\tESSID{Fore.RESET}")
             for bssid, info in access_points.items():
                 print(f"{Fore.GREEN}{bssid}\t{info['signal_strength']}\t{beacon_frames[bssid]}\t{info['channel']}\t{info['rate']}\t{info['channel_frequency']}MHz  \t{info['crypto']}\t{TABLINE if len(info['crypto']) < 10 else ''}{info['essid']}{Fore.RESET}")
         sleep(1)
