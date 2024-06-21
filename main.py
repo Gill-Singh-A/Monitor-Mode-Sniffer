@@ -2,11 +2,12 @@
 
 from os import geteuid, system
 from scapy.all import *
+from pathlib import Path
 from datetime import date
 from optparse import OptionParser
 from colorama import Fore, Back, Style
 from threading import Thread, Lock
-from time import strftime, localtime, sleep, time
+from time import strftime, localtime, sleep
 
 status_color = {
     '+': Fore.GREEN,
@@ -28,6 +29,7 @@ def get_arguments(*args):
 def check_root():
     return geteuid() == 0
 
+cwd = Path.cwd()
 lock = Lock()
 current_channel = None
 channel_hopping_delay = 0.5
@@ -238,5 +240,25 @@ if __name__ == "__main__":
     running = False
     sleep(arguments.delay + 2)
     if arguments.write:
-        display('+', f"Dumping Packets to file {Back.MAGENTA}{arguments.write}{Back.RESET}")
-        wrpcap(arguments.write, packets)
+        output_directory = cwd / arguments.write
+        output_directory.mkdir(exist_ok=True)
+        display('+', f"Dumping Data to Directory {Back.MAGENTA}{arguments.write}/{Back.RESET}")
+        wrpcap(f"{arguments.write}/packets.pcap", packets)
+        with open(f"{arguments.write}/access_points.csv", 'w') as file:
+            file.write(f"BSSID,POWER,BEACONS,SENT,RECV,CHANNEL,RATE,FREQUENCY,CRYPTO,ESSID\n")
+            file.write('\n'.join([f"{bssid},{info['signal_strength']},{beacon_frames[bssid]},{sent_frames[bssid]},{received_frames[bssid]},{info['channel']},{info['rate']},{info['channel_frequency']}MHz,{info['crypto']},{info['essid']}" for bssid, info in access_points.items()]))
+        with open(f"{arguments.write}/probe_requests.csv", 'w') as file:
+            file.write(f"ASSOCIATED,BSSID,POWER,RATE,SENT,RECV,FREQUENCY,PROBES\n")
+            file.write('\n'.join([f"{'--:--:--:--:--:--' if bssid not in associations or associations[bssid] == 'FF:FF:FF:FF:FF:FF' else associations[bssid]},{bssid},{info['signal_strength']},{info['rate']},{sent_frames[bssid]},{received_frames[bssid]},{info['channel_frequency']}MHz,{','.join(info['probes'])}" for bssid, info in probes.items()]))
+        for bssid in beacon_frames.keys():
+            if bssid in hidden_networks.keys():
+                hidden_networks.pop(bssid)
+        for bssid in access_points.keys():
+            if bssid in hidden_networks.keys():
+                hidden_networks.pop(bssid)
+        if len(hidden_networks) > 0:
+            with open(f"{arguments.write}/hidden_ssids.csv", 'w') as file:
+                file.write("HIDDEN BSSID,POWER,SENT,RECV,RATE,FREQUENCY,ESSID\n")
+                file.write('\n'.join([f"{bssid},{info['signal_strength']},{sent_frames[bssid]},{received_frames[bssid]},{info['rate']},{info['channel_frequency']}MHz,{info['essid']}" for bssid, info in hidden_networks.items()]))
+        with open(f"{arguments.write}/device_macs.txt", 'w') as file:
+            file.write('\n'.join(total_devices))
