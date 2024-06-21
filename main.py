@@ -38,6 +38,7 @@ sent_frames, received_frames = {}, {}
 beacon_frames = {}
 access_points = {}
 probes = {}
+associations = {}
 
 def hop_channels(interface, channels, delay):
     global current_channel
@@ -83,6 +84,8 @@ def process_packet(packet):
             if bssid not in beacon_frames.keys():
                 beacon_frames[bssid] = 0
             beacon_frames[bssid] += 1
+            associations[bssid] = recv_addr
+            associations[recv_addr] = bssid
     elif packet.haslayer(Dot11ProbeReq):
         bssid = packet[Dot11].addr2.upper()
         try:
@@ -110,6 +113,8 @@ def process_packet(packet):
             probes[bssid]["channel_frequency"] = channel_frequency
             probes[bssid]["signal_strength"] = signal_strength
             probes[bssid]["probes"].add(probe_essid)
+            associations[bssid] = recv_addr
+            associations[recv_addr] = bssid
     elif packet.haslayer(Dot11):
         try:
             bssid = packet[Dot11].addr2.upper()
@@ -130,16 +135,18 @@ def process_packet(packet):
             if recv_addr not in sent_frames.keys():
                 sent_frames[recv_addr] = 0
             received_frames[recv_addr] += 1
+            associations[bssid] = recv_addr
+            associations[recv_addr] = bssid
 def display_details():
     while running:
         system("clear")
         with lock:
             print(f"Current Channel = {current_channel}\n{Fore.CYAN}BSSID            \tPOWER\tBEACONS\tSENT\tRECV\tCHANNEL\tRATE\tFREQUENCY\tCRYPTO\t\tESSID{Fore.RESET}")
             for bssid, info in access_points.items():
-                print(f"{Fore.GREEN}{bssid}\t{info['signal_strength']}\t{beacon_frames[bssid]}\t{sent_frames[bssid]}\t{received_frames[bssid]}\t{info['channel']}\t{info['rate']}\t{info['channel_frequency']}MHz  \t{info['crypto']}\t{TABLINE if len(info['crypto']) < 10 else ''}{info['essid']}{Fore.RESET}")
-            print(f"{Fore.CYAN}BSSID            \tPOWER\tRATE\tSENT\tRECV\tFREQUENCY\tPROBES{Fore.RESET}")
+                print(f"{Fore.GREEN}{bssid}\t{info['signal_strength']}\t{beacon_frames[bssid]}\t{sent_frames[bssid]}\t{received_frames[bssid]}\t{info['channel']}\t{info['rate']}\t{info['channel_frequency']}MHz  \t{info['crypto']}\t{TABLINE if len(info['crypto']) < 8 else ''}{info['essid']}{Fore.RESET}")
+            print(f"{Fore.CYAN}ASSOCIATED \t\tBSSID            \tPOWER\tRATE\tSENT\tRECV\tFREQUENCY\tPROBES{Fore.RESET}")
             for bssid, info in probes.items():
-                print(f"{Fore.GREEN}{bssid}\t{info['signal_strength']}\t{info['rate']}\t{sent_frames[bssid]}\t{received_frames[bssid]}\t{info['channel_frequency']}MHz  \t{','.join(info['probes'])}{Fore.RESET}")
+                print(f"{Fore.GREEN}{'--:--:--:--:--:--' if bssid not in associations or associations[bssid] == 'FF:FF:FF:FF:FF:FF' else associations[bssid]}\t{bssid}\t{info['signal_strength']}\t{info['rate']}\t{sent_frames[bssid]}\t{received_frames[bssid]}\t{info['channel_frequency']}MHz  \t{','.join(info['probes'])}{Fore.RESET}")
         sleep(1)
 
 if __name__ == "__main__":
