@@ -39,6 +39,7 @@ beacon_frames = {}
 access_points = {}
 probes = {}
 associations = {}
+total_clients = set()
 
 def hop_channels(interface, channels, delay):
     global current_channel
@@ -86,6 +87,8 @@ def process_packet(packet):
             beacon_frames[bssid] += 1
             associations[bssid] = recv_addr
             associations[recv_addr] = bssid
+            total_clients.add(bssid)
+            total_clients.add(recv_addr)
     elif packet.haslayer(Dot11ProbeReq):
         bssid = packet[Dot11].addr2.upper()
         try:
@@ -115,6 +118,8 @@ def process_packet(packet):
             probes[bssid]["probes"].add(probe_essid)
             associations[bssid] = recv_addr
             associations[recv_addr] = bssid
+            total_clients.add(bssid)
+            total_clients.add(recv_addr)
     elif packet.haslayer(Dot11):
         try:
             bssid = packet[Dot11].addr2.upper()
@@ -137,6 +142,8 @@ def process_packet(packet):
             received_frames[recv_addr] += 1
             associations[bssid] = recv_addr
             associations[recv_addr] = bssid
+            total_clients.add(bssid)
+            total_clients.add(recv_addr)
 def display_details():
     while running:
         system("clear")
@@ -147,6 +154,7 @@ def display_details():
             print(f"{Fore.CYAN}ASSOCIATED \t\tBSSID            \tPOWER\tRATE\tSENT\tRECV\tFREQUENCY\tPROBES{Fore.RESET}")
             for bssid, info in probes.items():
                 print(f"{Fore.GREEN}{'--:--:--:--:--:--' if bssid not in associations or associations[bssid] == 'FF:FF:FF:FF:FF:FF' else associations[bssid]}\t{bssid}\t{info['signal_strength']}\t{info['rate']}\t{sent_frames[bssid]}\t{received_frames[bssid]}\t{info['channel_frequency']}MHz  \t{','.join(info['probes'])}{Fore.RESET}")
+            print(f"{Fore.CYAN}Total Devices Discovered{Fore.RESET} => {Fore.GREEN}{len(total_clients)}{Fore.RESET}")
         sleep(1)
 
 if __name__ == "__main__":
