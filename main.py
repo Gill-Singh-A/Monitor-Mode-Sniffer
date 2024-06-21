@@ -88,6 +88,9 @@ def display_details():
             print(f"Current Channel = {current_channel}\n{Fore.CYAN}BSSID            \tPOWER\tBEACONS\tCHANNEL\tRATE\tFREQUENCY\tCRYPTO\t\tESSID{Fore.RESET}")
             for bssid, info in access_points.items():
                 print(f"{Fore.GREEN}{bssid}\t{info['signal_strength']}\t{beacon_frames[bssid]}\t{info['channel']}\t{info['rate']}\t{info['channel_frequency']}MHz  \t{info['crypto']}\t{TABLINE if len(info['crypto']) < 10 else ''}{info['essid']}{Fore.RESET}")
+            print(f"{Fore.CYAN}BSSID            \tPOWER\tRATE\tFREQUENCY\tPROBES{Fore.RESET}")
+            for bssid, info in probes.items():
+                print(f"{Fore.GREEN}{bssid}\t{info['signal_strength']}\t{info['rate']}\t{info['channel_frequency']}MHz  \t{','.join(info['probes'])}{Fore.RESET}")
         sleep(1)
 
 if __name__ == "__main__":
