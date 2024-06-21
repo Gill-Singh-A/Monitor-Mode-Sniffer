@@ -32,13 +32,14 @@ lock = Lock()
 current_channel = None
 channel_hopping_delay = 0.5
 TABLINE = '\t'
+running = True
 
 beacon_frames = {}
 access_points = {}
 
 def hop_channels(interface, channels, delay):
     global current_channel
-    while True:
+    while running:
         for channel in channels:
             with lock:
                 current_channel = channel
@@ -67,7 +68,7 @@ def process_packet(packet):
                 beacon_frames[bssid] = 0
             beacon_frames[bssid] += 1
 def display_details():
-    while True:
+    while running:
         system("clear")
         print(f"Current Channel = {current_channel}\n{Fore.CYAN}BSSID            \tPOWER\tBEACONS\tCHANNEL\tRATE\tFREQUENCY\tCRYPTO\t\tESSID{Fore.RESET}")
         with lock:
@@ -101,8 +102,14 @@ if __name__ == "__main__":
     sleep(1)
     Thread(target=display_details, daemon=True).start()
     try:
-        sniff(iface=arguments.interface, prn=process_packet)
+        packets = sniff(iface=arguments.interface, prn=process_packet)
     except KeyboardInterrupt:
         display('*', f"Keyboard Interrupt Detected! Exiting...", start='\n')
     except Exception as error:
         display('-', f"Error Occured = {Back.YELLOW}{error}{Back.RESET}")
+    display('*', "Exiting")
+    running = False
+    sleep(arguments.delay + 2)
+    if arguments.write:
+        display('+', f"Dumping Packets to file {Back.MAGENTA}{arguments.write}{Back.RESET}")
+        wrpcap(arguments.write, packets)
