@@ -231,7 +231,10 @@ if __name__ == "__main__":
     sleep(1)
     Thread(target=display_details, daemon=True).start()
     try:
-        packets = sniff(iface=arguments.interface, prn=process_packet)
+        if arguments.write:
+            packets = sniff(iface=arguments.interface, prn=process_packet)
+        else:
+            sniff(iface=arguments.interface, prn=process_packet, store=False)
     except KeyboardInterrupt:
         display('*', f"Keyboard Interrupt Detected! Exiting...", start='\n')
     except Exception as error:
